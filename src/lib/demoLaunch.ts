@@ -12,7 +12,7 @@ import { useGame } from '../state/game'
 import { useLobby } from '../state/lobbyMode'
 import { useProfiles } from '../state/profiles'
 
-const SCREENS: ScreenId[] = ['play', 'playhub', 'builds', 'skins', 'rubies', 'friends', 'settings', 'hosting', 'premium']
+const SCREENS: ScreenId[] = ['play', 'playhub', 'builds', 'skins', 'friends', 'settings', 'premium']
 
 function whenProfiles(run: (name: string) => void) {
   const first = useProfiles.getState().profiles[0]

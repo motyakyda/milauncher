@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 import { hasMillidaAccount } from '../../lib/api'
 import { loadShopDay, type ItemRef, type ShopDay, type ShopGift } from '../../lib/rubies'
-import { setScreen, showToast } from '../../state/ui'
+import { showToast } from '../../state/ui'
 import { freshWishes, markWishSeen, wishedInShop } from './wish'
 
 /**
@@ -50,10 +50,7 @@ export const useShopGift = create<GiftState>((set) => ({
     loud.forEach((it) => toasted.add(it.code))
     if (loud.length) showToast('Из «Хочу» на витрине: ' + loud.map((it) => it.name).join(', '), 'ok', undefined, {
         label: 'Смотреть',
-        run: () => {
-          set({ tab: 'wish' })
-          setScreen('rubies')
-        },
+        run: () => set({ tab: 'wish' }),
       })
     set({ gift: day.gift ?? null, known: true, wishNew: fresh })
   },

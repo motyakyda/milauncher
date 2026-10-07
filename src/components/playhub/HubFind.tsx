@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '../Icon'
 import { Milli } from '../milli/Milli'
 import { openMilli } from '../../state/milli'
-import { useHubTab } from './hubTab'
+import { useAi } from '../../state/ai'
 import '../../styles/pixel/hub-ai-intro.css'
 
 /**
@@ -17,7 +17,8 @@ import '../../styles/pixel/hub-ai-intro.css'
  * пузырь гаснет, а Милли оседает — торчат только глаза, на наведение снова выглядывает.
  * Пузырь — в портале поверх всего, иначе его срезает шапка библиотеки.
  */
-export function HubFind({ onSearch }: { onSearch: (q: string) => void }) {
+export function HubFind() {
+  const ai = useAi((s) => s.on)
   const [q, setQ] = useState('')
   const [say, setSay] = useState(true)
   const [at, setAt] = useState<{ x: number; y: number; tail: number } | null>(null)
@@ -45,17 +46,16 @@ export function HubFind({ onSearch }: { onSearch: (q: string) => void }) {
     setAt({ ...at, x: left, tail: at.x - left })
   }, [at])
   const ask = () => {
-    // Milli lives in the catalog («Ресурсы»); on the library tab the dock hides her and the request sat unseen.
-    useHubTab.getState().setAll(true)
     openMilli(q.trim() ? { text: q.trim(), src: 'hub' } : { src: 'hub' })
   }
+  if (!ai) return null
   return (
     <form
       className="hub-find"
       role="search"
       onSubmit={(e) => {
         e.preventDefault()
-        onSearch(q.trim())
+        ask()
       }}
     >
       <label className="input hs-field hub-find-field">

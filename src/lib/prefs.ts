@@ -30,6 +30,7 @@ const DURABLE = [
   'm-anim-bg',
   'm-tab-ms',
   'm-perf-mode',
+  'm-ai',
 ] as const
 
 export type PrefKey = (typeof DURABLE)[number]

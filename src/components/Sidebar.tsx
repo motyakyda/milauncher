@@ -21,8 +21,6 @@ import { SKINS_IMPORT_EVENT, SKINS_UPLOAD_EVENT, useTopBar } from '../state/topb
 import { useUi } from '../state/ui'
 import type { ScreenId } from '../state/ui'
 import { useHasMillida } from '../state/auth'
-import { usePlus } from '../state/plus'
-import { onRealtime } from '../lib/realtime'
 import { preloadScreen } from '../screens/registry'
 
 /* Навигация как в Brawl Stars: у каждого раздела ровно один вход (владелец
@@ -152,7 +150,6 @@ export function Sidebar({ onNav }: { onNav: (s: ScreenId) => void }) {
   const reqIn = useFriends((s) => s.reqIn)
   const rooms = useRooms((s) => s.rooms)
   const millida = useHasMillida()
-  const plusActive = usePlus((s) => s.active)
   useAccounts()
   const acc = getAccount()
   const gameName = useGameNick((s) => s.name)
@@ -172,12 +169,6 @@ export function Sidebar({ onNav }: { onNav: (s: ScreenId) => void }) {
     document.addEventListener('click', onDoc)
     return () => document.removeEventListener('click', onDoc)
   }, [menuOpen])
-
-  useEffect(() => {
-    void usePlus.getState().load()
-  }, [millida])
-
-  useEffect(() => onRealtime('account', () => void usePlus.getState().load()), [])
 
   // Непрочитанное в группах считается тем же счётчиком: для человека это одно
   // и то же «мне написали», а не два разных места.
@@ -224,7 +215,7 @@ export function Sidebar({ onNav }: { onNav: (s: ScreenId) => void }) {
             ref={chipRef}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            <span className={'ava' + (plusActive ? ' is-plus' : '')}>
+            <span className="ava">
               <Head
                 nick={inGameNick || 'MHF_Steve'}
                 kind={acc ? acc.kind : undefined}
@@ -235,7 +226,7 @@ export function Sidebar({ onNav }: { onNav: (s: ScreenId) => void }) {
             </span>
             <span className="lb-acc-txt">
               <span className="acc-nick">{inGameNick || 'Гость'}</span>
-              <i className={plusActive ? 'plus' : ''}>{plusActive ? 'PLUS' : acc ? accKindLabel(acc.kind) : 'Войти'}</i>
+              <i>{acc ? accKindLabel(acc.kind) : 'Гость'}</i>
             </span>
             <Icon id="i-chev-d" />
           </div>

@@ -4,7 +4,6 @@ import { rubles, type PlusEconomy } from '../../lib/rubies'
 import { ChestLive } from '../daily/ChestLive'
 import { PLUS_PASS } from '../daily/chestDrops'
 import { gridCols } from './parts'
-import { setScreen } from '../../state/ui'
 
 const CHEST_WORD = { LEGEND: 'легендарный сундук', EPIC: 'эпических сундуков', RARE: 'редких сундука' } as const
 
@@ -30,9 +29,6 @@ export function PlusMonth({ plus, busy, onSubscribe }: { plus: PlusEconomy | nul
         <span className="sh-note">
           {active ? (plus.canceled ? 'Продления не будет · до ' : 'Активна до ') + until(plus.paidUntil) : 'Отмена в любой день'}
         </span>
-        <button className="btn md secondary sh-plus2-more" data-track="plus_more" onClick={() => setScreen('plus')}>
-          Подробнее
-        </button>
         {active ? null : (
           <button className="btn md primary sh-plus2-cta" disabled={busy === 'plus'} data-track="plus_subscribe" onClick={onSubscribe}>
             {plus.priceKopecks ? rubles(plus.priceKopecks) + ' в месяц' : 'Оформить'}

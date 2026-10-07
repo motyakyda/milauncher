@@ -17,7 +17,6 @@ import { useProfiles } from '../../state/profiles'
 import { SECTION_VISUAL } from './sections'
 import type { SectionSlug } from './sections'
 import { Fallback, MrIcon, RowActions, SiteGalleryCard, useCardHit } from './SiteRow'
-import { PriceMark, usePaidCard } from './PaidActs'
 import { useCatalogCtx } from './target'
 import { MediaStrip } from './MediaStrip'
 import { similarFor } from './similar'
@@ -454,7 +453,6 @@ function CardPage({ card, sec }: { card: SiteCard; sec: SiteSection }) {
   const { target } = useCatalogCtx()
   const { hit, resolve } = useCardHit(card)
   const { data, failed, retry } = useItemData(card, sec)
-  const paid = usePaidCard(card)
   const build = useTargetBuild()
   const [tab, setTab] = useState<Tab>('desc')
   const files = data ? data.files : []
@@ -512,12 +510,7 @@ function CardPage({ card, sec }: { card: SiteCard; sec: SiteSection }) {
         title={name}
         by={card.author ? 'от ' + card.author : null}
         facts={facts}
-        cta={
-          <>
-            <PriceMark card={card} />
-            <RowActions card={card} sec={sec} hit={hit} resolve={resolve} />
-          </>
-        }
+        cta={<RowActions card={card} sec={sec} hit={hit} resolve={resolve} />}
       />
       <div className="ci-grid">
         <main className="ci-main">
@@ -536,11 +529,11 @@ function CardPage({ card, sec }: { card: SiteCard; sec: SiteSection }) {
           ) : tab === 'gallery' ? (
             <Gallery urls={shots} />
           ) : (
-            <Versions files={filesFor(files, pick.version, loaderAxis ? pick.loader : null).length ? filesFor(files, pick.version, loaderAxis ? pick.loader : null) : files} onInstall={installFile} locked={paid.locked} />
+            <Versions files={filesFor(files, pick.version, loaderAxis ? pick.loader : null).length ? filesFor(files, pick.version, loaderAxis ? pick.loader : null) : files} onInstall={installFile} locked={false} />
           )}
         </main>
         <aside className="ci-aside">
-          {files.length ? <Picker files={files} loaderAxis={loaderAxis} pick={pick} onPick={setPick} onInstall={installFile} locked={paid.locked} /> : null}
+          {files.length ? <Picker files={files} loaderAxis={loaderAxis} pick={pick} onPick={setPick} onInstall={installFile} locked={false} /> : null}
           <Compat
             versions={card.versions.length ? card.versions : [...new Set(files.flatMap((f) => f.gameVersions))]}
             loaders={card.loaders.length ? card.loaders : [...new Set(files.flatMap((f) => f.loaders))]}

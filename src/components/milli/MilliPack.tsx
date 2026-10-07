@@ -114,9 +114,7 @@ function ServerPick({ pack, projectIds, onClose }: { pack: MilliPack; projectIds
       ) : !list ? (
         <span className="skel" style={{ height: 44 }} />
       ) : !list.length ? (
-        <button type="button" className="btn sm secondary" onClick={() => (closeMilli(), setScreen('hosting'))}>
-          Создать сервер
-        </button>
+        <p className="mpc-srv-done">Серверов нет</p>
       ) : (
         <ul className="mpc-srv-list">
           {list.map((s) => (

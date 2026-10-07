@@ -24,6 +24,7 @@ import type { MilliMode } from '../components/milli/milliMascot'
 import { emotionFor, milliEmote, milliHear } from '../components/milli/milliEmotions'
 import { hasMillidaAccount } from '../lib/api'
 import { track } from '../lib/telemetry'
+import { aiOn } from './ai'
 
 /*
  * Чат с Милли: одно состояние на весь лаунчер — кнопка в каталоге и панель
@@ -144,6 +145,8 @@ export async function refreshMilliStatus(): Promise<MilliStatus | null> {
 
 /** `src` — откуда открыли; клики и так считает data-track, здесь только для чтения кода. */
 export function openMilli(opts: { text?: string; preset?: AiPreset | null; src?: string } = {}) {
+  // ИИ выключен в настройках — панель не поднимаем.
+  if (!aiOn()) return
   set((s) => ({
     open: true,
     view: 'chat',

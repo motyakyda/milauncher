@@ -2,8 +2,6 @@ import { hasTauri } from '../ipc/tauri'
 import {
   createProfile,
   fpsBoostState,
-  millidaModInstall,
-  millidaModState,
   setFpsBoost,
   setProfileLoader,
   toggleContent,
@@ -165,12 +163,6 @@ async function applyFps(profile: string, on: boolean): Promise<void> {
   for (const file of st.mods) await toggleContent(profile, 'mod', file, on).catch(() => {})
 }
 
-/** Мод косметики Millida: запуск ставит его и сам, здесь — заранее, чтобы первый вход был со скином. */
-async function ensureCosmetics(profile: string): Promise<void> {
-  const st = await millidaModState(profile)
-  if (st.enabled && st.available && !st.installed) await millidaModInstall(profile)
-}
-
 /**
  * Сборка «Minecraft <version>» на Fabric (до 1.14 — Forge), готовая к запуску. Возвращает имя
  * сборки или null (браузер без ядра, ошибка создания). Моды FPS и косметики —
@@ -188,7 +180,6 @@ export async function ensureVersionBuild(version: string, opts: { fps: boolean }
   if (!name) return null
   const fps = opts.fps && (await fpsAvailable(version))
   await applyFps(name, fps).catch((e) => console.error('[version-build] fps', e))
-  await ensureCosmetics(name).catch((e) => console.error('[version-build] cosmetics', e))
   return name
 }
 
@@ -259,6 +250,5 @@ export async function ensurePresetBuild(v: PopularVersion, icon: string | null):
     const fps = await fpsAvailable(v.mc)
     if (fps) await applyFps(built, true).catch((e) => console.error('[preset-build] fps', e))
   }
-  await ensureCosmetics(built).catch((e) => console.error('[preset-build] cosmetics', e))
   return built
 }

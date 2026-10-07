@@ -5,7 +5,6 @@ import { MilliPackCard } from './MilliPack'
 import { MilliActionCard } from './MilliAction'
 import { MilliPicker } from './MilliPicker'
 import { messageAction } from '../../lib/milliActions'
-import { MilliPlusSheet, openPlusSheet } from './MilliPlusSheet'
 import { MilliSizePick, saveMilliSize } from './MilliSizePick'
 import { MilliSetup } from './MilliSetup'
 import { MilliProgress, MilliSendGlobe, milliThinkStep, type MilliSendGlobeHandle } from './MilliGlobe'
@@ -14,7 +13,7 @@ import { useBench } from '../../state/milliBench'
 import { MilliAva, MilliHead, MilliSafe, MilliScene } from './MilliStage'
 import { PxArt, type PxName } from './px'
 import { SUPPORT_URL, openExt } from '../../lib/api'
-import { LOADER_LABEL, MILLI_TEXT_MAX, isMilliSizeAsk, milliLeft, milliLook, milliPlanNumbers, milliPreviewOn, milliPreviewTier, milliResetText, setMilliPreviewTier } from '../../lib/milli'
+import { LOADER_LABEL, MILLI_TEXT_MAX, isMilliSizeAsk, milliLeft, milliLook, milliPreviewOn, milliPreviewTier, milliResetText, setMilliPreviewTier } from '../../lib/milli'
 import type { MilliError, MilliGreeting, MilliGreetingChip, MilliMessage } from '../../lib/milli'
 import { milliCue, type MilliMode } from './Milli'
 import { useHasMillida } from '../../state/auth'
@@ -33,10 +32,11 @@ import {
   showMilliHistory,
   useMilli,
 } from '../../state/milli'
-import { openModal, useUi } from '../../state/ui'
+import { useUi } from '../../state/ui'
 import { useHubTab } from '../playhub/hubTab'
 import { usePlus } from '../../state/plus'
 import { isMilliScreen } from '../../lib/milliScreens'
+import { useAi } from '../../state/ai'
 import { MilliPlan } from './MilliPlan'
 import '../../styles/pixel/milli.css'
 
@@ -293,51 +293,7 @@ function Chips({ items, src }: { items: string[]; src: string }) {
   )
 }
 
-/** Без PLUS: когда показать золотую карточку под ответом (шейдеры/паки/карты — по просьбе; после сборки — раз в день). */
-const GATE_RX = /шейдер|ресурс-? ?пак|ресурспак|текстур|карт[уаы]|сервер|хостинг/i
-const GATE_DAY_KEY = 'milli-plus-gate-day'
-function gateAfterBuild(): boolean {
-  try {
-    const d = new Date().toISOString().slice(0, 10)
-    if (localStorage.getItem(GATE_DAY_KEY) === d) return false
-    localStorage.setItem(GATE_DAY_KEY, d)
-    return true
-  } catch {
-    return false
-  }
-}
-const gateSeen = new Set<string>()
-
-function PlusNudges({ m, asked }: { m: MilliMessage; asked: string }) {
-  const status = useMilli((s) => s.status)
-  const plans = useMilli((s) => s.plans)
-  if (!status || status.plus) return null
-  const left = milliLeft(status)
-  // После сборки — один раз в день (запоминаем, на каком сообщении показали, чтобы не мигало при перерисовке).
-  const afterBuild = !!m.pack && !m.pack.stub && (gateSeen.has(m.id) || (gateAfterBuild() && (gateSeen.add(m.id), true)))
-  const asks = GATE_RX.test(asked)
-  return (
-    <>
-      {asks || afterBuild ? (
-        <button type="button" className="ml-gate" data-track="milli_plus_upsell" data-src={asks ? 'gate' : 'build'} onClick={() => openPlusSheet(asks ? 'gate' : 'build')}>
-          <PxArt name="glowstone" size={28} className="mci" />
-          <span>
-            {asks ? 'Шейдеры, паки и карты — с PLUS' : 'С PLUS добавлю шейдеры и карту'}
-            <small>Милли поставит их в сборку сама</small>
-          </span>
-          <em>PLUS</em>
-        </button>
-      ) : null}
-      {left !== null && left > 0 && left <= 3 ? (
-        <button type="button" className="ml-low" data-track="milli_plus_upsell" data-src="low" onClick={() => openPlusSheet('low')}>
-          Осталось {left} на сегодня · <b>с PLUS {milliPlanNumbers(plans).plus} в день</b>
-        </button>
-      ) : null}
-    </>
-  )
-}
-
-function Bubble({ m, last, cheer, asked = '' }: { m: MilliMessage; last: boolean; cheer?: boolean; asked?: string }) {
+function Bubble({ m, last, cheer }: { m: MilliMessage; last: boolean; cheer?: boolean }) {
   if (m.role === 'user') {
     return (
       <div className="ml-msg me">
@@ -379,7 +335,6 @@ function Bubble({ m, last, cheer, asked = '' }: { m: MilliMessage; last: boolean
           </MilliSafe>
         ) : null}
         {last && !askSize ? <Chips items={replyChips(m)} src="reply" /> : null}
-        {last ? <PlusNudges m={m} asked={asked} /> : null}
       </div>
     </div>
   )
@@ -390,10 +345,9 @@ function Gate() {
   return (
     <div className="ml-state">
       <Milli size={136} mode="wave" />
-      <button type="button" className="btn lg primary" data-track="milli_login" onClick={() => openModal('accModal')}>
-        <PxIcon name="login" size={12} />
-        Войти
-      </button>
+      <b>Нужен аккаунт Millida</b>
+      {/* Экрана входа в лаунчере больше нет: без сессии ИИ не ходит в API. */}
+      <span className="side-cap">Вход в эту сборку отключён — ИИ работает только с активной сессией</span>
     </div>
   )
 }
@@ -410,12 +364,6 @@ function ErrorCard({ e }: { e: MilliError }) {
           <b>{e.text}</b>
           {when ? <span>Снова {when}</span> : null}
         </span>
-        {!status?.plus ? (
-          <button type="button" className="btn sm primary ml-plus" data-track="milli_plus_upsell" data-src="limit" onClick={() => openPlusSheet('limit')}>
-            <PxIcon name="crown" size={12} />
-            Больше с PLUS
-          </button>
-        ) : null}
       </div>
     )
   }
@@ -555,26 +503,6 @@ const HELLO_FALLBACK = 'Привет! Какую сборку соберём?'
  * пузырь невидим (место занято), сбой или >1,5 с — запасная фраза.
  */
 function Hello({ mood }: { mood: MilliMode }) {
-  // Без PLUS Милли то и дело «примеряет» золотую корону (владелец: пусть засматривается на PLUS) — 2,4 с из каждых 9.
-  const free = useMilli((st) => !!st.status && !st.status.plus)
-  const [tryOn, setTryOn] = useState(false)
-  useEffect(() => {
-    if (!free || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    let off: number | undefined
-    const tick = window.setInterval(() => {
-      setTryOn(true)
-      off = window.setTimeout(() => setTryOn(false), 2400)
-    }, 9000)
-    const first = window.setTimeout(() => {
-      setTryOn(true)
-      off = window.setTimeout(() => setTryOn(false), 2400)
-    }, 2500)
-    return () => {
-      window.clearInterval(tick)
-      window.clearTimeout(first)
-      window.clearTimeout(off)
-    }
-  }, [free])
   const pending = useMilli((s) => s.pending)
   const [g, setG] = useState<MilliGreeting | null | undefined>(undefined)
   useEffect(() => {
@@ -592,14 +520,8 @@ function Hello({ mood }: { mood: MilliMode }) {
   return (
     <div className="ml-hello">
       <MilliSafe>
-        <MilliScene mode={tryOn ? 'happy' : mood === 'idle' ? 'wave' : mood} crown={tryOn ? 'gold' : null} />
+        <MilliScene mode={mood === 'idle' ? 'wave' : mood} />
       </MilliSafe>
-      {free ? (
-        <button type="button" className={'ml-tryon' + (tryOn ? ' on' : '')} data-track="milli_plus_upsell" data-src="tryon" onClick={() => openPlusSheet('tryon')} tabIndex={tryOn ? 0 : -1} aria-hidden={!tryOn}>
-          <PxIcon name="crown" size={12} />
-          Милли с PLUS
-        </button>
-      ) : null}
       <div className="ml-say" style={g === undefined ? { visibility: 'hidden' } : undefined}>
         <p className="ml-bubble">{g?.text ?? HELLO_FALLBACK}</p>
       </div>
@@ -635,7 +557,6 @@ function Panel() {
   const status = useMilli((s) => s.status)
   const mood = useMilli((s) => s.mood)
   const signed = useHasMillida()
-  const plans = useMilli((s) => s.plans)
   const plusActive = usePlus((s) => s.active)
   const [menu, setMenu] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -746,8 +667,8 @@ function Panel() {
       {!messages.length && !pending ? (
         <Hello mood={mood} />
       ) : null}
-      {messages.map((m, i) => (
-        <Bubble key={m.id} m={m} last={!pending && !error && m === lastAssistant} cheer={mood === 'happy' && m === lastAssistant} asked={messages[i - 1]?.role === 'user' ? messages[i - 1]!.text : ''} />
+      {messages.map((m) => (
+        <Bubble key={m.id} m={m} last={!pending && !error && m === lastAssistant} cheer={mood === 'happy' && m === lastAssistant} />
       ))}
       {pending ? <Thinking /> : null}
       {error && error.kind !== 'auth' ? <ErrorCard e={error} /> : null}
@@ -783,13 +704,6 @@ function Panel() {
             <span className="ml-tierchip-n">{milliLeft(status)}</span>
           </span>
         ) : null}
-        {/* Без PLUS: «осталось» и выгода одной золотой плашкой — видно сразу, клик открывает «Милли на максималках». */}
-        {signed && status && !status.plus && !off && !blocked ? (
-          <button type="button" className={'ml-up' + (milliLeft(status) === 0 ? ' out' : '')} data-track="milli_plus_upsell" data-src="head" aria-label={'Осталось ' + milliLeft(status) + '. Больше с PLUS'} onClick={() => openPlusSheet('head')}>
-            <span className="ml-up-n">{milliLeft(status)}</span>
-            <PxIcon name="crown" size={12} />×{milliPlanNumbers(plans).x} с PLUS
-          </button>
-        ) : null}
         <span className="ml-head-gap" />
         {view === 'history' ? (
           <button type="button" className="ml-hbtn" aria-label="Назад" onClick={() => useMilli.setState({ view: 'chat' })}>
@@ -809,7 +723,6 @@ function Panel() {
       <div className="ml-scroll" ref={scroller}>
         {body}
       </div>
-      <MilliPlusSheet />
       {signed && !off && !blocked && view === 'chat' ? <Composer /> : null}
     </aside>
   )
@@ -846,6 +759,7 @@ function SupportFab() {
  * панель, на остальных экранах — кнопка поддержки (владелец 30.09.2026).
  */
 export function MilliDock() {
+  const ai = useAi((s) => s.on)
   const logged = useUi((s) => s.logged)
   const screen = useUi((s) => s.screen)
   const buildOpen = useUi((s) => s.modals.bsModal.open)
@@ -860,7 +774,7 @@ export function MilliDock() {
     if (!here) closeMilli()
     else void refreshMilliPlans()
   }, [here])
-  if (!logged) return null
+  if (!ai || !logged) return null
   if (!here) return <SupportFab />
   return (
     <>

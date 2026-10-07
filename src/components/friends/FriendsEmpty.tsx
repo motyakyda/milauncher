@@ -1,5 +1,4 @@
 import { Icon } from '../Icon'
-import { PlayTogether } from './PlayTogether'
 
 /**
  * Пустой список. Поиск стоит в шапке экрана — пустое состояние только ставит
@@ -17,7 +16,6 @@ export function FriendsEmpty({ myNick, onFind }: { myNick: string; onFind: () =>
         </button>
         {myNick ? <p className="faint-note">Тебя найдут по нику {myNick}</p> : null}
       </div>
-      <PlayTogether />
     </>
   )
 }

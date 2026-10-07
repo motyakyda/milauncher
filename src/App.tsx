@@ -5,7 +5,6 @@ import { Sidebar } from './components/Sidebar'
 import { LaunchToast, Toast } from './components/Toast'
 import { RewardHost } from './components/reward/RewardReveal'
 import { initChatScreen } from './state/chatScreen'
-import { Login } from './screens/Login'
 import { PixelTip } from './components/PixelTip'
 import { MilliDock } from './components/milli/MilliDock'
 // Screens are mounted only while open, and their chunks are prewarmed after boot
@@ -13,15 +12,11 @@ import { MilliDock } from './components/milli/MilliDock'
 import {
   Builds,
   Friends,
-  Hosting,
   Messages,
-  Mods,
   PlayHub,
   Game,
   Play,
   Premium,
-  Plus,
-  Rubies,
   Servers,
   Settings,
   Skins,
@@ -33,7 +28,6 @@ import { MoveBuildsModal } from './modals/MoveBuilds'
 import { ProjectModal } from './modals/Project'
 import { NewBuildModal } from './modals/NewBuild'
 import { AccountAddModal } from './modals/AccountAdd'
-import { BuyModal } from './components/catalog/PaidActs'
 import { ModpackVersionsOverlay, ScreenshotsOverlay } from './modals/Overlays'
 import { MigrateBuildModal } from './modals/MigrateBuild'
 import { ImageLightbox } from './components/ImageLightbox'
@@ -59,8 +53,7 @@ import { createPresenceMemo, presenceEvents, presenceText, presenceTitle } from 
 import { initDesktopToasts, showDesktopToast } from './lib/desktopToast'
 import { parseInvite } from './lib/invite'
 import { parseCallLog } from './lib/call/callLog'
-import { effectiveNick, getAccount, getMillidaAccount, isMillidaKind, useAccounts } from './state/accounts'
-import { markMillidaEver, millidaEver } from './state/onboarding'
+import { effectiveNick, useAccounts } from './state/accounts'
 import { OnboardingModal } from './modals/Onboarding'
 import { Tour } from './components/Tour'
 import { initAccent } from './lib/accent'
@@ -191,7 +184,7 @@ import { initDeepLinks } from './lib/deeplink'
 import { initOverlayLink } from './lib/overlayLink'
 import { useMods } from './state/mods'
 import { refreshMsAccounts } from './state/msLogin'
-import { enterApp, logoutToLogin } from './lib/session'
+import { enterApp } from './lib/session'
 import { initSecrets } from './lib/secure'
 import { listenGameCrash, listenGameExit, listenGameServer, listenLaunchWarning, listenPackAccessLost, listenTrayExit } from './ipc/events'
 import { useCrash } from './state/crash'
@@ -341,22 +334,12 @@ export function App() {
     const onLeave = () => void flushPrefs()
     window.addEventListener('pagehide', onLeave)
     const safety = setTimeout(hideBoot, 4000)
-    // The "logged in at least once" flag lives in the durable prefs file, so the
-    // disk copy has to land before boot decides whether this account may skip login.
+    // Оболочка поднимается без входа: токен нужен только ИИ, и он сам скажет,
+    // что сессии нет. Сбой инициализации не должен оставить чёрное окно.
     void Promise.all([initSecrets(), hydratePrefs()]).then(() => {
       clearTimeout(safety)
-      const acc = getAccount()
-      if (getMillidaAccount()) markMillidaEver()
-      // Account present but its token did not survive a secret-storage migration:
-      // clear the session once instead of showing a half-logged-in state everywhere.
-      if (acc && isMillidaKind(acc.kind) && !hasMillidaAccount()) {
-        logoutToLogin()
-        showToast('После обновления войдите в Millida заново — один раз', 'error')
-      } else if (acc && !millidaEver()) {
-        logoutToLogin()
-        showToast('Войди в аккаунт Millida — это нужно один раз', 'error')
-      } else if (acc) enterApp()
-      else logoutToLogin()
+      // Входа в аккаунт больше нет: лаунчер сразу поднимает оболочку.
+      enterApp()
       void refreshProfiles()
       loadLiveRating()
       warmHeads(useAccounts.getState().list.filter((x) => !x.avatar).map((x) => x.nick))
@@ -367,6 +350,11 @@ export function App() {
       hideBoot()
       void initTelemetry(performance.now()).then(reportWebviewFailure)
       watchHeap()
+    }).catch((e) => {
+      console.error('[boot]', e)
+      clearTimeout(safety)
+      enterApp()
+      hideBoot()
     })
     return () => {
       stopPackAutoUpdate()
@@ -426,13 +414,10 @@ export function App() {
   }, [])
 
   useEffect(() => {
+    // Экрана входа больше нет: истёкшую сессию не гасим — ИИ сам ответит
+    // «Войди в аккаунт», а оболочка продолжает работать.
     const onExpired = () => {
-      // Чистим состояние и при logged=false: фоновые опросы (присутствие,
-      // телеметрия, синк) идут и до входа в оболочку, и без очистки аккаунт
-      // остаётся наполовину залогиненным до перезапуска.
-      const wasLogged = useUi.getState().logged
-      logoutToLogin()
-      if (wasLogged) showToast('Сессия истекла — войди заново', 'error')
+      if (useUi.getState().logged) showToast('Сессия Millida истекла — вход в лаунчере отключён', 'error')
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired)
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
@@ -763,8 +748,6 @@ export function App() {
         <Titlebar />
         <UpdateBanner />
 
-        <Login on={!logged} />
-
         <div className="app" id="scr-app" style={{ display: logged ? 'flex' : 'none' }}>
           <Sidebar
             onNav={(s) => {
@@ -790,11 +773,6 @@ export function App() {
                   <Premium on />
                 </Guard>
               )}
-              {screen === 'plus' && (
-                <Guard what="PLUS">
-                  <Plus on />
-                </Guard>
-              )}
               {screen === 'builds' && (
                 <Guard what="Сборки">
                   <Builds on />
@@ -805,19 +783,9 @@ export function App() {
                   <Servers on />
                 </Guard>
               )}
-              {screen === 'mods' && (
-                <Guard what="Каталог">
-                  <Mods on />
-                </Guard>
-              )}
               {screen === 'skins' && (
                 <Guard what="Экран скинов">
                   <Skins on />
-                </Guard>
-              )}
-              {screen === 'rubies' && (
-                <Guard what="Магазин">
-                  <Rubies on />
                 </Guard>
               )}
               {screen === 'friends' && (
@@ -828,11 +796,6 @@ export function App() {
               {screen === 'chat' && (
                 <Guard what="Сообщения">
                   <Messages on />
-                </Guard>
-              )}
-              {screen === 'hosting' && (
-                <Guard what="Хостинг">
-                  <Hosting on />
                 </Guard>
               )}
               {screen === 'playhub' && (
@@ -865,7 +828,6 @@ export function App() {
         <ProjectModal />
         <NewBuildModal />
         <AccountAddModal />
-        <BuyModal />
         <ScreenshotsOverlay />
         <ModpackVersionsOverlay />
         <MigrateBuildModal />

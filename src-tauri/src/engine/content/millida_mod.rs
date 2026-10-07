@@ -277,22 +277,22 @@ fn place_local_skin(dir: &Path, nick: &str) {
     }
 }
 
-/// Выключатель мода, общий для всех сборок.
+/// Разрешение на мод косметики, общее для всех сборок.
 ///
-/// Мод ставится принудительно, и до сих пор отказаться от него было нельзя
-/// вовсе: у кого он не уживался с остальными модами, у того не запускалась ни
-/// одна модовая сборка, и единственным выходом оставалась ванильная игра
-/// (16.09.2026, жалоба через Евгения). Карантин снимает только КОНКРЕТНУЮ
-/// версию и только после падения - осознанного отказа он не заменяет.
+/// Мод убран из лаунчера и по умолчанию не ставится ни в одну сборку: раньше
+/// он ставился принудительно, и у кого он не уживался с остальными модами, у
+/// того не запускалась ни одна модовая сборка (16.09.2026). Единственный путь
+/// включить его обратно - явный файл-разрешение; карантин снимает только
+/// КОНКРЕТНУЮ версию и только после падения - осознанного отказа он не заменяет.
 ///
 /// Хранится у ядра, а не у интерфейса: решение читается при запуске игры, и
 /// оно должно действовать, даже когда окно ещё не открывали.
-fn disabled_file() -> PathBuf {
-    data_dir().join("millida-mod-off")
+fn opt_in_file() -> PathBuf {
+    data_dir().join("millida-mod-on")
 }
 
 pub fn millida_mod_enabled() -> bool {
-    enabled_at(&disabled_file())
+    opt_in_at(&opt_in_file())
 }
 
 /// Игрок выключил статистику в лаунчере: мод в игре тоже молчит. Флаг живёт
@@ -313,10 +313,31 @@ pub fn set_game_telemetry_enabled(on: bool) -> Result<(), String> {
     }
 }
 
-/// Отсутствие файла - это «включено»: у тех, кто не трогал настройку, файла нет,
-/// и мод обязан ставиться сам.
+/// Отсутствие файла - это «включено»: у тех, кто не трогал настройку, файла нет.
+/// Так устроен выключатель статистики.
 fn enabled_at(file: &Path) -> bool {
     !file.exists()
+}
+
+/// У мода косметики зеркальное правило: файла разрешения нет - мод не ставится.
+fn opt_in_at(file: &Path) -> bool {
+    file.exists()
+}
+
+fn write_at(file: &Path) -> Result<(), String> {
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Настройка не сохранилась: {}", e))?;
+    }
+    std::fs::write(file, b"on").map_err(|e| format!("Настройка не сохранилась: {}", e))
+}
+
+/// Повторное выключение - не ошибка: файла и так нет.
+fn clear_at(file: &Path) -> Result<(), String> {
+    match std::fs::remove_file(file) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("Настройка не сохранилась: {}", e)),
+    }
 }
 
 fn turn_off_at(file: &Path) -> Result<(), String> {
@@ -339,9 +360,9 @@ fn turn_on_at(file: &Path) -> Result<(), String> {
 /// иначе игрок жмёт выключатель, запускает игру и видит мод на месте.
 pub fn set_millida_mod_enabled(on: bool) -> Result<(), String> {
     if on {
-        return turn_on_at(&disabled_file());
+        return write_at(&opt_in_file());
     }
-    turn_off_at(&disabled_file())?;
+    clear_at(&opt_in_file())?;
     for profile in load_profiles() {
         remove_mod_from(&profile.name);
     }
@@ -817,27 +838,42 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Мод ставится принудительно, поэтому отказ обязан пережить перезапуск
-    /// лаунчера и читаться до открытия окна. Свойство закреплено на файле:
-    /// пока его нет - мод ставится, появился - не ставится.
+    /// Мод косметики убран из лаунчера: отказ обязан пережить перезапуск и
+    /// читаться до открытия окна. Свойство закреплено на файле - зеркально
+    /// прежнему: пока файла разрешения нет, мод не ставится ни в одну сборку.
     #[test]
-    fn the_off_switch_is_the_file_and_defaults_to_on() {
+    fn the_mod_is_off_until_the_player_opts_in() {
         let dir = std::env::temp_dir().join(format!("millida-mod-switch-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let file = dir.join("millida-mod-off");
+        let file = dir.join("millida-mod-on");
 
-        assert!(enabled_at(&file), "не трогали настройку - мод ставится сам");
+        assert!(!opt_in_at(&file), "настройку не трогали - мод не ставится сам");
+
+        write_at(&file).expect("разрешение обязано сохраниться");
+        assert!(opt_in_at(&file), "с разрешением мод снова ставится");
+
+        clear_at(&file).expect("выключение обязано сохраниться");
+        assert!(!opt_in_at(&file), "после выключения мод не ставится ни в одну сборку");
+
+        clear_at(&file).expect("повторное выключение - не ошибка");
+        assert!(!opt_in_at(&file), "и состояние то же");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Статистика осталась с прежним правилом: файла нет - включена.
+    #[test]
+    fn the_telemetry_switch_defaults_to_on() {
+        let dir = std::env::temp_dir().join(format!("telemetry-switch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let file = dir.join("telemetry-off");
+
+        assert!(enabled_at(&file), "не трогали настройку - статистика включена");
 
         turn_off_at(&file).expect("выключение обязано сохраниться");
-        assert!(!enabled_at(&file), "после выключения мод не ставится ни в одну сборку");
-
-        turn_off_at(&file).expect("повторное выключение - не ошибка");
-        assert!(!enabled_at(&file), "и состояние то же");
+        assert!(!enabled_at(&file));
 
         turn_on_at(&file).expect("включение обязано сработать");
-        assert!(enabled_at(&file), "мод вернулся");
-
-        turn_on_at(&file).expect("включить включённое - не ошибка, файла просто нет");
         assert!(enabled_at(&file));
 
         let _ = std::fs::remove_dir_all(&dir);

@@ -19,7 +19,6 @@ import { FriendRow } from '../components/friends/FriendRow'
 import { AddRows, exactOf, isTechnicalNick, requestFor, sendRequest, useNickLookup } from '../components/friends/FriendSearch'
 import { FriendsEmpty } from '../components/friends/FriendsEmpty'
 import { unreadText } from '../components/friends/ChatRow'
-import { PlayTogether } from '../components/friends/PlayTogether'
 import { RequestsTab } from '../components/friends/RequestsTab'
 import { InviteTab } from '../components/friends/InviteTab'
 import {
@@ -402,7 +401,6 @@ export function Friends({ on }: { on: boolean }) {
 
           <div className="stack fr-list" id="frList" data-private data-section="friends_list">
             {addFirst ? addRows : null}
-            {tab === 'friends' && !needle && friends.length ? <PlayTogether /> : null}
             {tab === 'friends' ? (
               friendsTab()
             ) : tab === 'invite' ? (

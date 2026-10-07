@@ -14,6 +14,7 @@ import { crashAskBody, crashDisableOffers } from '../lib/crashAi'
 import { milliCrash } from '../lib/milli'
 import { useHasMillida } from '../state/auth'
 import { Milli } from './milli/Milli'
+import { useAi } from '../state/ai'
 
 const SUPPORT_ACT = 'support'
 
@@ -230,12 +231,13 @@ type CrashAiState =
  */
 function CrashAi({ info }: { info: CrashInfo }) {
   const hasMillida = useHasMillida()
+  const ai = useAi((s) => s.on)
   const [state, setState] = useState<CrashAiState>({ step: 'idle' })
   const [disabling, setDisabling] = useState('')
 
   useEffect(() => setState({ step: 'idle' }), [info])
 
-  if (!hasMillida || !hasTauri()) return null
+  if (!ai || !hasMillida || !hasTauri()) return null
 
   const ask = async () => {
     setState({ step: 'asking' })

@@ -91,10 +91,9 @@ import { ensureMcVersionList, useMcVersionList, versionOptions } from '../state/
 import { useGuarded, useProfiles } from '../state/profiles'
 import { catalogPackSlug } from '../lib/packUpdate'
 import { useInstance } from '../state/instance'
-import { closeModal, setScreen, showToast, useUi } from '../state/ui'
+import { closeModal, showToast, useUi } from '../state/ui'
 import { runRepair } from '../lib/repair'
 import { joinWithAuth, realLaunch, showLaunchError, startPrelaunch } from '../lib/launch'
-import { useMods } from '../state/mods'
 import { useModpackVersions } from '../state/modpack'
 import { useMigrate } from '../state/migrate'
 import { openProject } from '../state/project'
@@ -1049,20 +1048,6 @@ export function InstancePage() {
               </div>
               <div className="act-row">
                 <button
-                  className="btn sm primary act-row-btn"
-                  id="bsAddContent"
-                  onClick={() => {
-                    useProfiles.getState().setSelected(profile)
-                    close()
-                    setScreen('mods')
-                    useMods.getState().scopeTo(profile)
-                    useMods.getState().set({ modTab: 'mod' })
-                    void useMods.getState().load()
-                  }}
-                >
-                  <Icon id="i-plus" /> Добавить
-                </button>
-                <button
                   className="btn sm secondary act-row-btn"
                   id="bsDrop"
                   disabled={dropBusy}
@@ -1547,21 +1532,6 @@ export function InstancePage() {
                   <Icon id="i-plus" /> Сервер
                 </button>
               </div>
-              <button
-                className="btn sm secondary"
-                id="bsAddWorld"
-                style={{ width: '100%', marginTop: '8px' }}
-                onClick={() => {
-                  useProfiles.getState().setSelected(profile)
-                  close()
-                  setScreen('mods')
-                  useMods.getState().scopeTo(profile)
-                  useMods.getState().set({ modTab: 'world', fCat: 'все' })
-                  void useMods.getState().load()
-                }}
-              >
-                <Icon id="i-map" /> Карты из каталога
-              </button>
             </div>
 
             {tab === 'shots' ? (

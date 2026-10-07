@@ -56,8 +56,8 @@ import { WALLET_URL, openExt } from '../lib/api'
 // (или до входа в аккаунт), навсегда застревала на «Нужен аккаунт Millida».
 import { useHasMillida } from '../state/auth'
 import { setSkinSource, skinSource } from '../lib/gameProfile'
-import { millidaModEnabled, setMillidaModEnabled } from '../ipc/commands'
 import { startTour } from '../state/tour'
+import { useAi } from '../state/ai'
 import { buildDiagnostics } from '../lib/diag'
 import { copyText } from '../lib/clipboard'
 import { loadPrivacy, usePrivacy } from '../lib/privacy'
@@ -202,6 +202,8 @@ export function Settings({ on }: { on: boolean }) {
   const [query, setQuery] = useState('')
   const wantTab = useUi((s) => s.settingsTab)
   const takeSettingsTab = useUi((s) => s.takeSettingsTab)
+  const ai = useAi((s) => s.on)
+  const setAi = useAi((s) => s.setAi)
   const [accent, setAccent] = useState(initialAccent)
   const [customHex, setCustomHex] = useState(initialCustomHex)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -211,7 +213,6 @@ export function Settings({ on }: { on: boolean }) {
     hotkey: 'Alt+M',
     cardMs: CARD_TTL_MS,
   })
-  const [modOn, setModOn] = useState(true)
   const showSnapshots = useMcVersionList((s) => s.show)
   const [cacheMb, setCacheMb] = useState<number | null>(null)
   const [clearing, setClearing] = useState(false)
@@ -265,7 +266,6 @@ export function Settings({ on }: { on: boolean }) {
         .then((b) => setCacheMb(Math.round(b / 1024 / 1024)))
         .catch(() => setCacheMb(0))
     void overlayState().then(setOverlay).catch(() => {})
-    void millidaModEnabled().then(setModOn).catch(() => {})
     void listJavaRuntimes().then(setJavas).catch(() => {})
     void defaultJava().then(setJavaDef).catch(() => {})
     void javaMajors()
@@ -611,24 +611,6 @@ export function Settings({ on }: { on: boolean }) {
             }}
           />
         </Row>
-        <Row title="Мод Millida" hint="Скины, плащи и эмоции в игре" keys="мод эмоции плащи">
-          <Toggle
-            id="setMillidaMod"
-            label="Мод Millida"
-            on={modOn}
-            onChange={() => {
-              const next = !modOn
-              setModOn(next)
-              setMillidaModEnabled(next)
-                .then(() => showToast(next ? 'Мод вернётся при следующем запуске сборки' : 'Мод убран из сборок'))
-                .catch((err) => {
-                  console.error('[settings] millida mod', err)
-                  setModOn(!next)
-                  showToast('Не получилось — попробуй ещё раз', 'error')
-                })
-            }}
-          />
-        </Row>
       </Group>
 
       <Group title="Во время игры">
@@ -941,6 +923,14 @@ export function Settings({ on }: { on: boolean }) {
 
   const about = (
     <>
+      <Block keys="ии искусственный интеллект милли ai ассистент">
+        <Group title="ИИ (Милли)">
+          <Row title="ИИ в лаунчере" hint={ai ? 'Милли собирает сборки и отвечает в чате' : 'Выключен — кнопок ИИ в лаунчере нет'} keys="ии искусственный интеллект милли ai ассистент">
+            <Toggle label="ИИ в лаунчере" on={ai} onChange={() => setAi(!ai)} />
+          </Row>
+        </Group>
+      </Block>
+
       <Block keys="версия обновление обновить проверить">
         <div className="s2-hero">
           <img src="/millida-logo.svg" alt="" width={48} height={48} />

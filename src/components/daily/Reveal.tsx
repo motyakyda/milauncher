@@ -5,7 +5,6 @@ import { playSound } from '../../lib/sound'
 import { rubles } from '../../lib/rubies'
 import type { ChestTier, DailyClaim, GrantedReward, Reward, WeekItem as WeekItemData } from '../../lib/rubies'
 import { useDaily } from '../../state/daily'
-import { useUi } from '../../state/ui'
 import { Chest3D } from './Chest3D'
 import type { ChestMode } from './chestScene'
 import { FragmentCells } from './WeekItem'
@@ -235,10 +234,8 @@ export function Reveal({
           autoFocus
           onClick={() => {
             onDone()
-            if (toChests) {
-              useDaily.getState().setModal(false)
-              useUi.getState().setScreen('rubies')
-            }
+            // Магазин с рубинами убран из лаунчера — остаёмся в наградах.
+            if (toChests) useDaily.getState().setModal(false)
           }}
         >
           {toChests ? 'Открыть сундук' : 'К наградам'}

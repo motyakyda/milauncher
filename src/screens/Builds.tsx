@@ -6,7 +6,7 @@ import { useProfiles } from '../state/profiles'
 import { useModUpdates } from '../state/modUpdates'
 import { refreshPlayStats, usePlayStats } from '../state/playStats'
 import { rememberServerName } from '../state/playStats'
-import { openModal, setScreen, showToast } from '../state/ui'
+import { openModal, showToast } from '../state/ui'
 import { quickJoin } from '../lib/joinServer'
 import { composeIcon, randomIconRecipe, rememberIconRecipe } from '../lib/iconArt'
 import type { IconRecipe } from '../lib/iconArt'
@@ -217,9 +217,6 @@ export function Builds({ on }: { on: boolean }) {
             <div className="bx-empty-acts">
               <button className="btn md primary" data-sound="open" onClick={() => openModal('nbModal')}>
                 <Icon id="i-plus" /> Новая сборка
-              </button>
-              <button className="btn md secondary" onClick={() => setScreen('mods')}>
-                <Icon id="i-blocks" /> Готовые сборки
               </button>
               <button className="btn md secondary" data-sound="open" onClick={() => openModal('impModal')}>
                 <Icon id="i-download" /> Импорт

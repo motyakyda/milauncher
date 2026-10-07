@@ -4,7 +4,6 @@ import { BuildIcon } from '../components/playhub/BuildIcon'
 import { Installs } from '../components/Installs'
 import { LobbyCharacter } from '../components/lobby/LobbyCharacter'
 import { EmoteBubble } from '../components/lobby/EmoteBubble'
-import { Recommend } from '../components/lobby/Recommend'
 import { AnarchyArt } from '../components/playhub/AnarchyTile'
 import { targetsAnarchy } from '../lib/ownServer'
 import { PixelField } from '../components/lobby/PixelField'
@@ -199,16 +198,13 @@ export function Play({ on }: { on: boolean }) {
       </div>
       <LobbyCharacter on={on} />
       <EmoteBubble />
-      <Recommend on={on} />
       {/* Левый край — как в Brawl Stars: крупный сундук и под ним разделы.
           Боковой полосы на главной нет (владелец 23.09.2026). */}
       {/* Ежедневный бонус живёт в магазине (правка владельца 21:43): плитки
           бонуса нет, у «Магазина» «!», пока бонус не забран. */}
       <div className="lobby-left">
         <nav className="lobby-nav" aria-label="Разделы">
-          <HubTile kind="shop" />
           <HubTile kind="wardrobe" />
-          <HubTile kind="server" />
         </nav>
       </div>
       <div className="lobby-who">

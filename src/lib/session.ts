@@ -96,15 +96,12 @@ export function forgetMillidaIfGone() {
 
 export function logoutToLogin() {
   dropMillidaSession()
-  // Убираем сам аккаунт Millida/TG из списка: иначе при следующем запуске
-  // getAccount() снова true → enterApp() поднимает залогиненную оболочку без
-  // токена (кошелёк/друзья/хостинг молча мертвы, вернуться на вход нельзя).
-  // Microsoft/офлайн-аккаунты не трогаем — у них свои токены.
+  // Экрана входа больше нет: сбрасываем только сессию (ИИ ответит, что
+  // аккаунта нет), но оболочку не гасим — иначе чёрное окно без выхода.
   const acc = useAccounts.getState()
   acc.list
     .filter((a) => a.kind === 'millida' || a.kind === 'tg')
     .forEach((a) => acc.remove(a.id))
-  useUi.getState().setLogged(false)
   syncAuth()
   void refreshGameNick()
 }

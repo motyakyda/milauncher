@@ -1,10 +1,7 @@
 import { useTopBar } from '../state/topbar'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { blockFor, serverTint } from '../components/catalog/itemView'
-import type { CSSProperties, ReactNode } from 'react'
-import { modeBackground, modeLook } from '../components/playhub/modeArt'
-import { modeScene } from '../components/iso/modeScenes'
-import { modeIcon } from '../components/playhub/modeIcon'
+import type { ReactNode } from 'react'
 import { Icon } from '../components/Icon'
 import { noteVisitKind, noteVisitSection } from '../lib/recsSignals'
 import { sectionBySlug } from '../components/catalog/site'
@@ -21,38 +18,26 @@ import { playMode } from '../lib/lobbyPlay'
 import type { MillidaPack } from '../ipc/commands'
 import type { SnapshotServer } from '../lib/snapshot'
 import {
-  OWN_SERVER,
   blockArt,
   loadCatalogPacks,
-  loadLiveModes,
   loadModrinthPacks,
-  loadOwnOnline,
   loadPackServer,
   playVersions,
   versionCover,
 } from '../components/playhub/data'
-import type { FeedSort, HubPack, LiveMode, ModeStats, ServerModeDef } from '../components/playhub/data'
-import { HeroSkel } from '../components/playhub/HubTop'
+import type { HubPack, ServerModeDef } from '../components/playhub/data'
+
 import { PackPage } from '../components/playhub/PackPage'
 import { MyBuildCard, useMyBuilds } from '../components/playhub/MyBuilds'
 import { ServerFeed } from '../components/playhub/ServerFeed'
-import { ModeTile } from '../components/playhub/ModeTile'
 import { useHubTab } from '../components/playhub/hubTab'
 import { GAMES, gameHero, useGame } from '../lib/games'
 import '../styles/pixel/game.css'
 import type { HubSection } from '../components/playhub/hubTab'
 import { useMods } from '../state/mods'
-import { ForYou } from '../components/playhub/ForYou'
 import { PlayTogether } from '../components/playhub/PlayTogether'
 import { CatalogPane } from './Mods'
-import { track } from '../lib/telemetry'
-import { ANARCHY, ONEBLOCK_PACK, anarchyMode, modeAction, ownServerMode, targetsAnarchy, targetsOwnServer } from '../lib/ownServer'
-import { loadAnarchyOnline } from '../lib/anarchy'
-import { AnarchyTile } from '../components/playhub/AnarchyTile'
-import { PrisonTile } from '../components/playhub/PrisonTile'
-import { PRISON_SLUG, featuredSpot } from '../components/playhub/featured'
-import { modesShown, shelfOrder, shownCount, withPrison } from '../components/playhub/placement'
-import { usePromo } from '../state/promo'
+import { ONEBLOCK_PACK, ownServerMode, targetsOwnServer } from '../lib/ownServer'
 import '../styles/pixel/playhub.css'
 
 /**
@@ -65,22 +50,6 @@ import '../styles/pixel/playhub.css'
  * «Новая сборка» и «Импорт» — в верхней полосе хаба (PlayhubBar).
  * «Продолжить» здесь нет: продолжение — кнопка «Играть» в лобби.
  */
-
-function CardSkel({ n }: { n: number }) {
-  return (
-    <>
-      {Array.from({ length: n }, (_, i) => (
-        <span key={i} className="ph-card skel-card" aria-hidden="true">
-          <span className="ph-card-art skel"></span>
-          <span className="ph-card-body">
-            <span className="skel skel-line" style={{ width: '60%' }}></span>
-            <span className="skel skel-line" style={{ width: '35%', height: 9 }}></span>
-          </span>
-        </span>
-      ))}
-    </>
-  )
-}
 
 /** Картинка карточки. Не загрузилась (зеркало CDN не ответило) — прячем, а не рисуем «битую» иконку. */
 /**
@@ -117,19 +86,6 @@ const img = (src: string | null | undefined) =>
     />
   ) : null
 
-/** Полка без ответа прода: короткая фраза и «Повторить», без технического текста. */
-function NoAnswer({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="ph-noans">
-      <Icon id="i-alert" />
-      <b>Не загрузилось</b>
-      <button className="btn sm secondary" data-track="retry" onClick={onRetry}>
-        <Icon id="i-restart" /> Повторить
-      </button>
-    </div>
-  )
-}
-
 function Players({ n, approx }: { n: number; approx?: boolean }) {
   return (
     <>
@@ -149,113 +105,6 @@ function versionSpan(list: string[]): string {
   return lo === hi ? lo : lo + '–' + hi
 }
 
-const servers = (n: number) => fmtN(n) + ' ' + plural(n, 'сервер', 'сервера', 'серверов')
-
-const FEED_SORTS: [FeedSort, string][] = [
-  ['rating', 'По рейтингу'],
-  ['online', 'По онлайну'],
-  ['votes', 'По голосам'],
-  ['new', 'Новые'],
-]
-
-/** Серверы одного режима — лента рейтинга по его тегу: выбрал — играешь. */
-function ModePage({
-  def,
-  stats,
-  current,
-  onPick,
-}: {
-  def: ServerModeDef
-  stats: ModeStats | null | undefined
-  current: LobbyMode | null
-  onPick: (s: SnapshotServer) => void
-}) {
-  // Картинка — та же, что у плитки режима: свет в цвете режима и сцена из блоков.
-  const art = useMemo(() => {
-    // Набор значков в стиле Blups — тот же, что у плитки; кода нет — сцена из блоков.
-    const set = modeIcon(def.cat)
-    if (set?.rig) return { color: set.color, bg: set.bg, icon: { url: set.rig.url, w: set.rig.w, h: set.rig.h }, k: 230 / set.rig.h, set: true, rig: true }
-    if (set) return { color: set.color, bg: set.bg, icon: { url: set.icon, w: 16, h: 16 }, k: 10, set: true, rig: false }
-    const color = modeLook(def.cat).color
-    const icon = modeScene(def.cat)
-    const k = Math.max(1, Math.floor(Math.min(200 / icon.w, 200 / icon.h) * 2) / 2)
-    return { color, bg: modeBackground(color, 480), icon, k, set: false, rig: false }
-  }, [def.cat])
-  // Поиск по серверам режима: запрос уходит в рейтинг через паузу в наборе.
-  const [q, setQ] = useState('')
-  const [sort, setSort] = useState<FeedSort>('rating')
-  const [search, setSearch] = useState('')
-  useEffect(() => {
-    const t = window.setTimeout(() => setSearch(q.trim().length >= 2 ? q.trim() : ''), 300)
-    return () => window.clearTimeout(t)
-  }, [q])
-  // Аналитика поиска внутри режима: длина запроса и число найденных, без текста.
-  const [found, setFound] = useState<{ search: string; total: number } | null>(null)
-  useEffect(() => {
-    if (!search || !found || found.search !== search) return
-    const t = window.setTimeout(
-      () => track('catalog_search', { section: 'mode', mode: def.cat, len: search.length, results: found.total }),
-      800,
-    )
-    return () => window.clearTimeout(t)
-  }, [search, found])
-  return (
-    <div className="ph-mode" data-mode={def.cat} data-section="mode">
-      <header className="ph-mode-hero">
-        <span className="ph-mode-bg" style={{ '--mode-c': art.color } as CSSProperties}>
-          <span className={'ph-mode-art' + (art.set ? ' is-set' : '') + (art.rig ? ' is-rig' : '')} style={{ backgroundImage: 'url(' + art.bg + ')' }}>
-            <img src={art.icon.url} style={{ width: art.icon.w * art.k, height: art.icon.h * art.k }} alt="" draggable={false} />
-          </span>
-        </span>
-        <div className="ph-mode-title">
-          <h1>{def.title}</h1>
-          {stats ? (
-            <span className="ph-mode-meta">
-              <Players n={stats.online} /> играют · {servers(stats.total)}
-            </span>
-          ) : null}
-        </div>
-      </header>
-      <div className="ph-mode-tools">
-        <label className="input hs-field ph-mode-find">
-          <Icon id="i-search" />
-          <input value={q} placeholder="Имя или адрес сервера" maxLength={60} onChange={(e) => setQ(e.target.value)} />
-          {q ? (
-            <button type="button" className="hs-clear" aria-label="Очистить" data-track="search_clear" onClick={() => setQ('')}>
-              <Icon id="i-x" />
-            </button>
-          ) : null}
-        </label>
-        <div className="segs mr-sort ph-mode-sort" role="group" aria-label="Сортировка серверов">
-          {FEED_SORTS.map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={'seg' + (sort === id ? ' on' : '')}
-              aria-pressed={sort === id}
-              data-track={'mode_sort_' + id}
-              onClick={() => setSort(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <ServerFeed
-        category={def.cat}
-        search={search}
-        sort={sort}
-        onFirstPage={(total, s) => setFound({ search: s, total })}
-        render={(s, i) => <ServerRow s={s} def={def} pos={i} current={current} onPlay={onPick} />}
-      />
-    </div>
-  )
-}
-
-/**
- * «Серверы» во вкладке «Ресурсы» — лента мониторинга Millida целиком, с
- * поиском по имени или адресу (владелец 24.09.2026, 18:29).
- */
 function AllServers({ current, onPick }: { current: LobbyMode | null; onPick: (s: SnapshotServer) => void }) {
   const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
@@ -328,18 +177,9 @@ export function PlayHub({ on }: { on?: boolean }) {
   const loadLobby = useLobby((s) => s.load)
   const profiles = useProfiles((s) => s.profiles)
 
-  const [modes, setModes] = useState<LiveMode[] | null>(null)
-  const [ownOnline, setOwnOnline] = useState<number | null>(null)
-  const [anarchyOnline, setAnarchyOnline] = useState<number | null>(null)
-  const anarchyLead = usePromo((s) => s.promo.modesLead === ANARCHY.mode)
-  const foldedCount = modesShown(anarchyLead)
   const [packs, setPacks] = useState<MillidaPack[] | null>(null)
   const [mrPacks, setMrPacks] = useState<HubPack[] | null>(null)
-  /** Режимы: 7 плиток, «Остальные» раскрывает остальные на месте. */
-  const [allModes, setAllModes] = useState(false)
   const [allBuilds, setAllBuilds] = useState(false)
-  const lobbyLoaded = useLobby((s) => s.loaded)
-  const [openCat, setOpenCat] = useState<string | null>(null)
   /** Сборка на своей странице. */
   const [pageId, setPageId] = useState<string | null>(null)
   const [packServer, setPackServer] = useState<SnapshotServer | null>(null)
@@ -353,53 +193,32 @@ export function PlayHub({ on }: { on?: boolean }) {
   useLayoutEffect(() => () => useHubTab.getState().reset(), [])
   const mine = useMyBuilds(profiles)
   const shelf = buildsShelf(mine, current && current.kind === 'build' ? current.name : null, allBuilds)
-  /** «Повторить» у блока, которому прод не ответил. */
-  const [tick, setTick] = useState(0)
-  const retry = () => {
-    setPacks(null)
-    setMrPacks(null)
-    setModes(null)
-    setTick((t) => t + 1)
-  }
 
   useEffect(() => {
     void loadLobby()
     let alive = true
     void loadCatalogPacks().then((l) => alive && setPacks(l))
     void loadModrinthPacks().then((l) => alive && setMrPacks(l))
-    void loadLiveModes().then((l) => alive && setModes(l))
-    void loadOwnOnline().then((n) => alive && setOwnOnline(n))
-    void loadAnarchyOnline().then((n) => alive && setAnarchyOnline(n))
     return () => {
       alive = false
     }
-  }, [tick])
+  }, [])
 
   const top0 = () => document.getElementById('s-playhub')?.scrollIntoView({ block: 'start' })
 
   // Подстраница открыта — верхняя «← Лобби» становится «← Назад» (правка
   // владельца 22:38), своих кнопок «Назад» на подстраницах больше нет.
   const setBack = useTopBar((st) => st.setBack)
-  const setBare = useTopBar((st) => st.setBare)
-  // Серверы режима — страница мониторинга: наверху только «← Назад», без
-  // вкладок «Библиотека | Ресурсы» (владелец 27.09.2026).
-  useEffect(() => {
-    setBare(on !== false && !!openCat)
-    return () => setBare(false)
-  }, [on, openCat])
   useEffect(() => {
     // «Каталог Millida» — вкладка переключателя, а не подстраница: наверху
     // остаётся «Лобби» (владелец 24.09.2026, 16:52).
-    if (on === false || !(openCat || pageId)) {
+    if (on === false || !pageId) {
       setBack(null)
       return
     }
-    setBack(() => {
-      if (openCat) setOpenCat(null)
-      else if (pageId) setPageId(null)
-    })
+    setBack(() => setPageId(null))
     return () => setBack(null)
-  }, [on, openCat, pageId])
+  }, [on, pageId])
 
   /** «Играть» на этом экране — сразу запуск, как и ждёт человек от этой кнопки. */
   const launch = (m: LobbyMode) => {
@@ -430,9 +249,6 @@ export function PlayHub({ on }: { on?: boolean }) {
     return [...ours, ...(mrPacks || [])]
   }, [packs, mrPacks])
 
-  const prisonPack = packs === null ? undefined : catalogPacks.find((p) => p.slug === PRISON_SLUG) || null
-  const featured = featuredSpot(prisonPack)
-
   const obPack = catalogPacks.find((p) => p.slug === ONEBLOCK_PACK) || premiumPacks.find((p) => p.slug === ONEBLOCK_PACK) || null
   const ownMode = obPack ? premiumMode(obPack) : ownServerMode()
 
@@ -461,56 +277,31 @@ export function PlayHub({ on }: { on?: boolean }) {
     }
   }, [page && page.id])
 
-  const own = OWN_SERVER
-  const shelfModes = useMemo(
-    () => withPrison(shelfOrder(modes || []), prisonPack ? { def: { cat: PRISON_SLUG }, pack: prisonPack } : null),
-    [modes, prisonPack],
-  )
   const wrap = (child: ReactNode) => (
     <section className={'screen playhub' + (on ? ' on' : '')} id="s-playhub">
       {child}
     </section>
   )
 
-  const openMode = openCat ? (modes || []).find((m) => m.def.cat === openCat) || null : null
   // Пришли из «Рекомендуем» в лобби: сборка — её страница, режим — его
   // серверы; «Назад» ведёт на главную хаба.
   const hubTarget = useLobby((s) => s.hubTarget)
   useEffect(() => {
-    if (!hubTarget) return
-    if (hubTarget.mode) {
-      setAll(false)
-      setOpenCat(hubTarget.mode)
-      track('mode_open', { mode: hubTarget.mode, source: 'recommend' })
-      useLobby.setState({ hubTarget: null })
-    } else if (hubTarget.pack) {
-      setAll(false)
-      const p = allPacks.find((x) => x.slug === hubTarget.pack)
-      if (!p) return
-      setPageId(p.id)
-      useLobby.setState({ hubTarget: null })
-    }
+    if (!hubTarget || !hubTarget.pack) return
+    setAll(false)
+    const p = allPacks.find((x) => x.slug === hubTarget.pack)
+    if (!p) return
+    setPageId(p.id)
+    useLobby.setState({ hubTarget: null })
   }, [hubTarget, allPacks])
   // Вход снаружи к разделу (openHubTab('modes'), openHubTab('builds')) — прокрутка к нему.
   useEffect(() => {
-    if (!section || all || openCat || pageId) return
+    if (!section || all || pageId) return
     // «Мой сервер» и «Arcania Labs» теперь карточки «Для тебя».
     const id = section === 'server' || section === 'try' ? 'foryou' : section
     requestAnimationFrame(() => document.getElementById('hub-sec-' + id)?.scrollIntoView({ block: 'start' }))
     useHubTab.setState({ section: null })
-  }, [section, all, openCat, pageId])
-
-  // Режим из лобби, а режимы ещё грузятся — заглушка, а не мелькание «Каталога».
-  if (openCat && modes === null) return wrap(<HeroSkel />)
-  if (openMode)
-    return wrap(
-      <ModePage
-        def={openMode.def}
-        stats={openMode.stats}
-        current={current}
-        onPick={(s) => launch(serverMode(s))}
-      />,
-    )
+  }, [section, all, pageId])
 
   if (page)
     return wrap(
@@ -528,50 +319,6 @@ export function PlayHub({ on }: { on?: boolean }) {
     setPageId(p.id)
     top0()
   }
-  const pickMode = (cat: string, source: 'hub' | 'search' | 'foryou' = 'hub') => {
-    track('mode_open', { mode: cat, source })
-    if (cat === ANARCHY.mode) {
-      launch(anarchyMode())
-      return
-    }
-    if (modeAction(cat) === 'launch') {
-      launch(ownMode)
-      return
-    }
-    setOpenCat(cat)
-    top0()
-  }
-
-  const modeTile = (m: LiveMode, i: number) => (
-    <ModeTile
-      key={m.def.cat}
-      cat={m.def.cat}
-      title={m.def.title}
-      online={m.def.cat === own.mode ? ownOnline ?? 0 : m.stats.online}
-      index={i}
-      on={
-        m.def.cat === own.mode
-          ? targetsOwnServer(current)
-          : current && current.kind === 'server'
-            ? m.stats.slugs.includes(current.slug)
-            : false
-      }
-      onClick={() => pickMode(m.def.cat)}
-    />
-  )
-
-  // Онлайн OneBlock — для карточки «Для тебя» (сейчас скрыта до релиза).
-  const obOnline = ownOnline
-  // «Для тебя»: Arcania — вторая карточка, бесплатные сборки Millida от
-  // самых популярных — в ротацию.
-  const arcaniaPack = premiumPacks.find(isArcania) || premiumPacks[0] || null
-  const premiumWait = !lobbyLoaded || packs === null
-  const freeOurs = catalogPacks
-    .filter((p) => p.origin === 'millida')
-    .sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
-  // Лента «Рекомендуем» в четыре ряда: сначала сборки Millida, дальше Modrinth.
-  const forYouPacks = [...freeOurs, ...catalogPacks.filter((p) => p.origin !== 'millida')]
-
   // «Сборки»: одна строка самых популярных (6 на 1200, 4 на 900 — лишние
   // прячет CSS), «Все» в шапке — полный каталог. Arcania из «Для тебя»
   // второй раз не ставим.
@@ -583,48 +330,6 @@ export function PlayHub({ on }: { on?: boolean }) {
     setAll(true)
     top0()
   }
-  const shownModes = shelfModes.slice(0, shownCount(shelfModes.length, allModes, anarchyLead))
-
-  const modesPane = (
-    <div className="ph-row ph-mts" data-section="modes">
-      {modes === null || prisonPack === undefined ? (
-        <CardSkel n={10} />
-      ) : shelfModes.length ? (
-        <>
-          {anarchyLead ? (
-            <AnarchyTile
-              index={0}
-              online={anarchyOnline}
-              on={targetsAnarchy(current)}
-              onClick={() => pickMode(ANARCHY.mode)}
-            />
-          ) : null}
-          {shownModes.map((m, i) =>
-            'pack' in m ? <PrisonTile key={PRISON_SLUG} cell index={i} pack={m.pack} onClick={() => openPack(m.pack)} /> : modeTile(m, i),
-          )}
-          {shelfModes.length > foldedCount ? (
-            <button
-              className="ph-card ph-mt ph-mt-all"
-              data-sound="nav"
-              data-track={allModes ? 'modes_less' : 'modes_more'}
-              aria-expanded={allModes}
-              onClick={() => setAllModes((v) => !v)}
-            >
-              <span className="ph-mt-all-ic">
-                <Icon id={allModes ? 'i-chev-u' : 'i-grid'} />
-              </span>
-              <span className="ph-mt-foot">
-                <b>{allModes ? 'Свернуть' : 'Остальные'}</b>
-                {allModes ? null : <span className="ph-mt-on">{shelfModes.length - foldedCount + ' ' + plural(shelfModes.length - foldedCount, 'режим', 'режима', 'режимов')}</span>}
-              </span>
-            </button>
-          ) : null}
-        </>
-      ) : (
-        <NoAnswer onRetry={retry} />
-      )}
-    </div>
-  )
 
   const head = (id: HubSection, title: string | null, body: ReactNode, more?: ReactNode) => (
     <section key={id} className="hub-sec" id={'hub-sec-' + id}>
@@ -662,7 +367,7 @@ export function PlayHub({ on }: { on?: boolean }) {
       {/* Первый экран (владелец 30.09.2026), как на millida.net/katalog: поле,
           крупная «Найти» и «Собрать с ИИ». Текст поля — запрос каталога или
           просьба к Милли. */}
-      <HubFind onSearch={(q) => openSection('modpack', q)} />
+      <HubFind />
       {/* 1. Свои сборки обычными карточками с обложкой; нет сборок — полка
           версий Minecraft, как было. */}
       {mine.length
@@ -747,33 +452,7 @@ export function PlayHub({ on }: { on?: boolean }) {
               ))}
             </div>,
           )}
-      {/* 3. Рекомендуем: хостинг, эксклюзивы, OneBlock, дальше лента в четыре ряда. */}
-      {head(
-        'foryou',
-        'Рекомендуем',
-        <ForYou
-          on={!!on}
-          arcania={arcaniaPack}
-          exclusives={premiumPacks}
-          premiumWait={premiumWait}
-          packs={forYouPacks}
-          oneblockOnline={obOnline}
-          anarchyOnline={anarchyOnline}
-          featured={featured}
-          onPlay={launch}
-          onPack={openPack}
-          onMode={(cat) => pickMode(cat, 'foryou')}
-          onMap={(name) => openSection('world', name)}
-          onMore={() => openSection('all')}
-          onItem={(section, card) => {
-            noteVisitSection(section)
-            openSection(sectionBySlug(section).kind)
-            requestAnimationFrame(() => openItem({ kind: 'card', section, card }))
-          }}
-        />,
-      )}
       {/* Полка «Сборки» убрана: каталог — во вкладке «Ресурсы» (17:31). */}
-      {head('modes', 'Режимы', modesPane)}
       {/* Играть вдвоём — сборки и карты «С другом» из разных тем, как на сайте. */}
       {head(
         'together',

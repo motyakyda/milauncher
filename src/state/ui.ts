@@ -81,6 +81,13 @@ interface UiState {
 
 const emptyModal = (): ModalState => ({ open: false, vis: false })
 
+/**
+ * Разделы экосистемы Millida убраны из лаунчера (вход, каталог, Plus, хостинг,
+ * рубины). Старые входы — deeplink, карточки, трекинг — не должны открывать
+ * мёртвые экраны: переводим их в лобби.
+ */
+const GONE_SCREENS: readonly string[] = ['plus', 'hosting', 'rubies', 'mods']
+
 function hasStoredAccount(): boolean {
   try {
     const list = JSON.parse(localStorage.getItem('m-accounts') || 'null')
@@ -127,7 +134,7 @@ export const useUi = create<UiState>((set, get) => ({
   setLogged: (v) => set({ logged: v }),
   // Transition keeps the current screen mounted while the next chunk loads,
   // instead of flashing the empty Suspense fallback.
-  setScreen: (s) => startTransition(() => set({ screen: s })),
+  setScreen: (s) => startTransition(() => set({ screen: GONE_SCREENS.includes(s) ? 'play' : s })),
   showToast: (msg, kind, sound, action) => {
     const k = kind || (ERROR_RE.test(msg) ? 'error' : 'ok')
     // A build name or a server answer can be arbitrarily long; the toast is a

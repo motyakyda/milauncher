@@ -5,7 +5,7 @@ import { useMods } from '../../state/mods'
 /**
  * Экран «Во что играем», версия 5 (владелец 24.09.2026, 16:09): одна страница
  * без вкладок — Мои сборки → Для тебя (свой сервер, Arcania Labs, OneBlock,
- * карты, сборки) → Сборки → Режимы → Зайти на сервер. «server»/«try» ведут
+ * карты, сборки) → Сборки → Зайти на сервер. «server»/«try» ведут
  * к «Для тебя». Весь каталог (сборки, моды, паки, шейдеры, карты, поиск,
  * фильтры) — страница «Все» поверх хаба, как каталог millida.net.
  *
@@ -14,7 +14,7 @@ import { useMods } from '../../state/mods'
  */
 export type HubTab = 'catalog' | 'builds'
 /** Раздел, к которому прокрутить при входе снаружи («add» — полный каталог с модами). */
-export type HubSection = 'server' | 'try' | 'builds' | 'foryou' | 'packs' | 'modes' | 'servers' | 'games' | 'add' | 'categories' | 'together'
+export type HubSection = 'server' | 'try' | 'builds' | 'foryou' | 'packs' | 'servers' | 'games' | 'add' | 'categories' | 'together'
 
 interface HubTabState {
   tab: HubTab
@@ -36,18 +36,17 @@ export const useHubTab = create<HubTabState>((set) => ({
   section: null,
   seq: 0,
   setTab: (t) => set({ tab: t, all: false, section: t === 'builds' ? 'builds' : null }),
-  setAll: (v) => set({ all: v }),
+  setAll: (v) => set({ all: v, section: null }),
   reset: () => set({ tab: 'catalog', all: false, section: null }),
 }))
 
 /**
  * Вход в каталог снаружи: «Добавить» в сборке, «Карты» в лобби, старый
- * `setScreen('mods')` — полный каталог на том разделе, что выставили
- * перед переходом (сборки, моды, паки, шейдеры, карты).
+ * `setScreen('mods')`. Каталога больше нет — остаёмся в библиотеке.
  */
 export function openHubBuild(modTab?: string) {
   if (modTab) useMods.getState().set({ modTab, fCats: [], fCat: 'все', count: '' })
-  useHubTab.setState((s) => ({ tab: 'catalog', all: true, section: null, seq: s.seq + 1 }))
+  useHubTab.setState((s) => ({ tab: 'catalog', all: false, section: null, seq: s.seq + 1 }))
   setScreen('playhub')
 }
 

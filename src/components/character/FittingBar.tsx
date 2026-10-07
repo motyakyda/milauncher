@@ -60,8 +60,8 @@ export function FittingBar({
   onTone: (id: string, tone: string) => void
   onClear: () => void
   onBuy: () => void
-  /** Рубинов не хватает — в пополнение. */
-  onTopUp: () => void
+  /** Рубинов не хватает — в пополнение (пополнение убрано из лаунчера). */
+  onTopUp?: () => void
   onWear: () => void
   /** В сете есть вещи PLUS, а подписки нет. */
   onPlus?: () => void
@@ -124,12 +124,11 @@ export function FittingBar({
         ) : null}
         {total > 0 ? (
           needLogin ? (
-            <button className="btn md primary" disabled={busy} data-track="login" onClick={onBuy}>
-              <Icon id="i-login" />
-              Войти
+            <button className="btn md secondary" disabled title="Вход в лаунчере отключён">
+              Нужен аккаунт Millida
             </button>
           ) : short > 0 ? (
-            <button className="btn md primary" disabled={busy} data-track="fitting_topup" onClick={onTopUp}>
+            <button className="btn md primary" disabled={busy || !onTopUp} data-track="fitting_topup" onClick={onTopUp}>
               Не хватает
               <Ruby size={14} />
               {short}

@@ -24,7 +24,7 @@ import { showReward } from '../components/reward/RewardReveal'
 import { PxIcon } from '../components/PxIcon'
 import { aiPresetFor } from '../lib/aiBuilder'
 import { openMilli } from '../state/milli'
-import { openHubBuild } from '../components/playhub/hubTab'
+import { useAi } from '../state/ai'
 
 /**
  * «Новая сборка» (правки владельца 23.09.2026, 19:40): иконка сборки как в
@@ -58,6 +58,7 @@ export function NewBuildModal() {
   const [pickIcon, setPickIcon] = useState(false)
   const [fps, setFps] = useState(true)
   const [busy, setBusy] = useState(false)
+  const ai = useAi((st) => st.on)
   const [join, setJoin] = useState<JoinIntent | null>(null)
   const [query, setQuery] = useState('')
   const [vanillaAsk, setVanillaAsk] = useState(false)
@@ -362,22 +363,22 @@ export function NewBuildModal() {
         </div>
 
         <div className="nb-foot">
-          <button
-            type="button"
-            className="btn md ghost"
-            id="nbAi"
-            data-track="ai_from_new_build"
-            disabled={busy}
-            onClick={() => {
-              close()
-              // Милли живёт в каталоге: ведём в «Ресурсы» и открываем её там.
-              openHubBuild()
-              openMilli({ preset: aiPresetFor(loader, ver), src: 'new_build' })
-            }}
-          >
-            <PxIcon name="sparkle" size={18} />
-            Собрать с Милли
-          </button>
+          {ai ? (
+            <button
+              type="button"
+              className="btn md ghost"
+              id="nbAi"
+              data-track="ai_from_new_build"
+              disabled={busy}
+              onClick={() => {
+                close()
+                openMilli({ preset: aiPresetFor(loader, ver), src: 'new_build' })
+              }}
+            >
+              <PxIcon name="sparkle" size={18} />
+              Собрать с Милли
+            </button>
+          ) : null}
           <button className="btn md secondary" id="nbCancel" data-sound="close" onClick={close}>
             Отмена
           </button>

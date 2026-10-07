@@ -440,7 +440,6 @@ export function PackPage({
           onOwned={reloadDetail}
           server={server}
           onServer={onServer}
-          onHost={hostTarget ? () => setHostOpen(true) : undefined}
           onBack={onBack}
         >
           {hostOpen && hostTarget ? <HostInstall target={hostTarget} onClose={() => setHostOpen(false)} /> : null}
@@ -482,13 +481,8 @@ export function PackPage({
         by={author ? 'Собрал ' + author : null}
         facts={inline}
         cta={
-          hostTarget || server ? (
+          server ? (
             <div className="mr-actions">
-              {hostTarget ? (
-                <button className="btn md secondary" data-sound="open" data-track="host_install" onClick={() => setHostOpen(true)}>
-                  <Icon id="i-server-cog" /> Поставить на хостинг
-                </button>
-              ) : null}
               {server ? (
                 <button className="btn md secondary" data-track="pack_server" data-src="pack_page" onClick={() => onServer(server)}>
                   <Icon id="i-server" /> Сервер сборки

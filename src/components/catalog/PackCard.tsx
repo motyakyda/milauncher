@@ -1,6 +1,5 @@
 import { Icon } from '../Icon'
 import { fmt } from '../../lib/format'
-import { priceLabel } from '../../lib/premium'
 import type { HubPack } from '../playhub/data'
 
 /*
@@ -10,7 +9,6 @@ import type { HubPack } from '../playhub/data'
  * без ярлыков «платные / сливы» (владелец 24.09.2026).
  */
 export function PackCard({ p, onOpen }: { p: HubPack; onOpen: () => void }) {
-  const price = priceLabel(p)
   const facts = [p.loader, p.mcVersion].filter(Boolean).join(' · ')
   return (
     <article className="card cat3-card" onClick={onOpen}>
@@ -20,7 +18,6 @@ export function PackCard({ p, onOpen }: { p: HubPack; onOpen: () => void }) {
         ) : (
           <Icon id="i-box2" />
         )}
-        {price ? <span className="cat3-price">{price}</span> : null}
       </div>
       <div className="cat3-body">
         <b>{p.title}</b>

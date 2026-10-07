@@ -1,18 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import { Icon } from '../Icon'
-import { HostInstall } from '../playhub/HostInstall'
-import type { HostTarget } from '../playhub/HostInstall'
-import { blockArt, hostingPackFor, isExclusive, loadHostingPacks } from '../playhub/data'
-import type { HostingPack } from '../playhub/data'
+import { blockArt, isExclusive } from '../playhub/data'
 import { useCatalogCtx } from './target'
 import { openExt } from '../../lib/api'
 import { rowClickOpens } from '../../lib/dismiss'
 import { useModAction } from '../ModRow'
 import { hasTauri } from '../../ipc/tauri'
 import type { ModHit } from '../../state/mods'
-import { useLobby } from '../../state/lobbyMode'
-import { priceLabel } from '../../lib/premium'
 import { newBuildFrom, planFor } from './newBuildFrom'
 import { partnerFrame } from '../premium/packView'
 import {
@@ -21,7 +16,6 @@ import {
   categoryIconSrc,
   displayName,
   fmtNum,
-  hostable,
   loaderIconSrc,
   loaderLabel,
   loaderTone,
@@ -36,7 +30,8 @@ import {
   versionRange,
 } from './site'
 import type { SiteCard, SiteSection } from './site'
-import { BuyBar, NativeBar, PriceMark, nativeKind, usePaidCard } from './PaidActs'
+
+import { NativeBar, nativeKind } from './PaidActs'
 import { installMillidaItem } from './millidaInstall'
 import { isPaid } from './paid'
 import { SECTION_VISUAL } from './sections'
@@ -84,15 +79,6 @@ function Glyph({ d }: { d: string }) {
   )
 }
 const SIDE_GLYPH: Record<string, string> = { CLIENT: GLYPH.client!, SERVER: GLYPH.server!, BOTH: GLYPH.both! }
-
-/** Знак Millida Hosting — две стойки квадратами (`HostingMark` сайта). */
-export function HostingMark() {
-  return (
-    <svg className="mr-host-mark" viewBox="0 0 16 16" aria-hidden="true">
-      <path fillRule="evenodd" d="M1 1h14v6H1zM3 3v2h6V3zM11 3v2h2V3zM1 9h14v6H1zM3 11v2h6v-2zM11 11v2h2v-2z" />
-    </svg>
-  )
-}
 
 interface Tag {
   label: string
@@ -220,7 +206,7 @@ function ActBar({
   newBusy,
   extra,
 }: {
-  /** «На хостинг» — после главной кнопки. */
+  /** Дополнительная кнопка после главной (адрес). */
   extra?: ReactNode
   label: string
   plus: boolean
@@ -258,7 +244,6 @@ function ActBar({
         {plus ? <Icon id="i-plus" /> : null}
         {label}
       </button>
-      {/* «На хостинг» — после главной кнопки, как на сайте. */}
       {extra}
     </div>
   )
@@ -301,82 +286,6 @@ function Bound({ h, kind, want, onFired, extra }: { h: ModHit; kind: string; wan
   )
 }
 
-/**
- * «На сервер» — материал на свой сервер хостинга Millida (приказ владельца
- * 24.09.2026, 18:35). Окно одно на весь лаунчер (`HostInstall`): нет сервера —
- * «Создать сервер», один — подтверждение, несколько — выбор. В панели сервера
- * ставит сразу на него.
- */
-export function ServerButton({ target, primary }: { target: HostTarget; primary?: boolean }) {
-  const ctx = useCatalogCtx().target
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        className={'btn sm ' + (primary ? 'primary' : 'secondary') + ' mr-host'}
-        data-track="to_server"
-        data-sound="open"
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(true)
-        }}
-      >
-        <HostingMark />
-        На хостинг
-      </button>
-      {open ? (
-        // Портал всплывает по дереву React — клик в окне не должен открыть строку.
-        <span className="mr-host-portal" onClick={(e) => e.stopPropagation()}>
-          <HostInstall
-            target={target}
-            serverId={ctx.kind === 'server' ? ctx.serverId : undefined}
-            onClose={() => setOpen(false)}
-            onDone={ctx.kind === 'server' ? ctx.onInstalled : undefined}
-          />
-        </span>
-      ) : null}
-    </>
-  )
-}
-
-/**
- * Своя сборка каталога (MCSborki, Arcania) хостингом ставится не по адресу
- * каталога, а целиком по ключу (`GET /hosting/packs`, как «Поставить на
- * хостинг» на странице сборки). Нет ключа — на сервер её не поставить.
- */
-function usePartnerPack(card: SiteCard, sec: SiteSection): HostingPack | null {
-  const want = sec.kind === 'modpack' && !!card.launcherOnly
-  const [pack, setPack] = useState<HostingPack | null>(null)
-  useEffect(() => {
-    if (!want) return
-    let alive = true
-    void loadHostingPacks().then((l) => alive && setPack(hostingPackFor({ slug: card.slug, title: displayName(card.title) }, l)))
-    return () => {
-      alive = false
-    }
-  }, [want, card.slug])
-  return want ? pack : null
-}
-
-/** Кнопка «На сервер» строки — или null, если материал на сервер не встаёт. */
-function useServerButton(card: SiteCard, sec: SiteSection): ReactNode {
-  const { target } = useCatalogCtx()
-  const partner = usePartnerPack(card, sec)
-  const title = displayName(card.title)
-  const primary = target.kind === 'server'
-  if (partner) return <ServerButton target={{ kind: 'partner', pack: partner, title }} primary={primary} />
-  // Реклама хостинга в каждой карточке (владелец 30.09.2026): «На хостинг» у
-  // всего, что хостинг принимает, — и у серверных модов; у клиентских нет.
-  if (!hostable(sec, card)) return null
-  if (card.mrHit && card.mrHit.cfid !== undefined)
-    return <ServerButton target={{ kind: 'curseforge', projectId: String(card.mrHit.cfid), title }} primary={primary} />
-  if (card.mrHit) {
-    const projectId = card.mrHit.pid || card.mrHit.slug
-    return projectId ? <ServerButton target={{ kind: 'modrinth', projectId, title }} primary={primary} /> : null
-  }
-  return <ServerButton target={{ kind: 'catalog', section: sec.slug, slug: card.slug, title }} primary={primary} />
-}
-
 function Actions({
   card,
   sec,
@@ -392,7 +301,6 @@ function Actions({
 }) {
   const [want, setWant] = useState<Want | null>(null)
   const [busy, setBusy] = useState(false)
-  const paid = usePaidCard(card)
   const content = CONTENT.has(sec.kind)
   // Вещь Millida без источника на Modrinth ставится своим файлом каталога.
   const native = () =>
@@ -400,14 +308,6 @@ function Actions({
       ? void installMillidaItem({ slug: card.slug, title: displayName(card.title), kind: sec.kind, paid: isPaid(card.pricing, card.priceKopecks) })
       : openOnSite(sec.slug, card.slug)
   // Платное без доступа: сначала покупка, после неё — та же установка.
-  if (paid.locked)
-    return (
-      <BuyBar
-        card={card}
-        extra={server}
-        onOwned={() => void resolve().then((h) => (h ? setWant('add') : native()))}
-      />
-    )
   // Сборка Милли из каталога: файла на зеркале нет, есть код — ставится как «Сборка по коду».
   const code = sec.kind === 'modpack' ? aiPackCode(card) : null
   if (code)
@@ -458,7 +358,7 @@ function Actions({
 export function RowActions(props: { card: SiteCard; sec: SiteSection; hit: ModHit | null | undefined; resolve: () => Promise<ModHit | null> }) {
   const { target } = useCatalogCtx()
   const compact = useContext(CompactCtx)
-  const server = useServerButton(props.card, props.sec)
+  const server: ReactNode = null
   if (target.kind === 'server') return <div className="mr-actions">{server}</div>
   // В сборку не ставятся: плагины и серверные сборки — на сервер, аддоны — Bedrock.
   // Вместо «Установить», за которым отказ, — «На сервер» и страница на сайте.
@@ -524,12 +424,6 @@ function rowTags(card: SiteCard): Tag[] {
   return tags
 }
 
-/** Цена платной сборки — только если её прислал сервер витрины; иначе пусто. */
-function usePrice(card: SiteCard): string {
-  const pack = useLobby((s) => (card.premium ? s.premium.find((p) => (p.slug || p.id) === card.slug) : undefined))
-  return pack ? priceLabel(pack) : ''
-}
-
 export function SiteRow(props: RowProps) {
   const { card, sec } = props
   const { hit, resolve } = useCardHit(card)
@@ -537,7 +431,6 @@ export function SiteRow(props: RowProps) {
   const name = displayName(card.title)
   const updated = relativeTime(realUpdated(card))
   const dl = ownDownloads(card)
-  const price = usePrice(card)
   // У наших сборок логотипа нет, есть обложка — она и встаёт в квадрат 96×96
   // (правка владельца 24.09.2026: «вместо букв I, L, C — обложка сборки»).
   const logo = card.icon || card.cover
@@ -568,7 +461,6 @@ export function SiteRow(props: RowProps) {
         <Tags tags={rowTags(card)} />
       </div>
       <div className="mr-side">
-        <PriceMark card={card} fallback={price} />
         {dl ? (
           <span className="mr-stat">
             <Icon id="i-download" />
@@ -680,9 +572,6 @@ export function SiteGalleryCard(props: RowProps) {
           {card.summary ? <span className="mr-gal-summary">{card.summary}</span> : null}
           <Tags tags={tags.slice(0, 3)} className="mr-gal-tags" />
           <span className="mr-gal-foot">
-            <span className="mr-gal-stat">
-              <PriceMark card={card} />
-            </span>
             <RowActions card={card} sec={sec} hit={hit} resolve={resolve} />
           </span>
         </span>
@@ -763,7 +652,6 @@ export function HitRow({ h, pos }: { h: ModHit; pos?: number }) {
             done={a.done}
             busy={a.running}
             onMain={a.onClick}
-            extra={h.cfid ? <ServerButton target={{ kind: 'curseforge', projectId: String(h.cfid), title: h.title, map: true }} /> : null}
           />
         </div>
       </article>
@@ -815,9 +703,6 @@ export function MapRow({ m, pos }: { m: MapHit; pos?: number }) {
             <span className="mr-stat-unit">{plural(m.downloads, 'скачивание', 'скачивания', 'скачиваний')}</span>
           </span>
         ) : null}
-        <div className="mr-actions">
-          <ServerButton target={{ kind: 'curseforge', projectId: String(m.id), title: m.name, map: true }} primary />
-        </div>
       </div>
     </article>
   )

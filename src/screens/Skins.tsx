@@ -6,7 +6,7 @@ import { SKINS_IMPORT_EVENT, SKINS_UPLOAD_EVENT } from '../state/topbar'
 import { HEAD_FROM_CPU, getAccount, useAccounts } from '../state/accounts'
 import type { Account } from '../state/accounts'
 import { noteCosmeticsSeen } from '../state/newHint'
-import { setScreen, showToast } from '../state/ui'
+import { showToast } from '../state/ui'
 import { accKindLabel } from '../lib/format'
 import { onRenderGate, renderLive } from '../lib/renderGate'
 import { hasTauri } from '../ipc/tauri'
@@ -2813,7 +2813,7 @@ export function Skins({ on }: { on: boolean }) {
     if (price > rubies) {
       result(false, 'insufficient')
       showToast('Не хватает ' + (price - rubies) + ' ' + rubyWord(price - rubies), 'error')
-      return setScreen('rubies')
+      return
     }
     const ok = await uiConfirm('«' + offer.title + '» за ' + price + ' ' + rubyWord(price) + '. Купить и надеть?', {
       title: 'Докупить набор',
@@ -3491,7 +3491,6 @@ export function Skins({ on }: { on: boolean }) {
             onTone={(id, tone) => setVariantById((now) => ({ ...now, [id]: tone }))}
             onClear={() => setFitting([])}
             onBuy={() => (!hasMillidaAccount() ? logoutToLogin() : void buyFitting())}
-            onTopUp={() => setScreen('rubies')}
             onWear={() => void wearFitting()}
             offer={
               setOffer
@@ -3499,11 +3498,6 @@ export function Skins({ on }: { on: boolean }) {
                     price: setList.find((x) => x.id === setOffer.setId)?.colorways.find((c) => c.name === setOffer.colorway)?.price ?? setOffer.price,
                     onBuy: () => (!hasMillidaAccount() ? logoutToLogin() : void buySetOffer()),
                   }
-                : undefined
-            }
-            onPlus={
-              !plus?.active && fitting.some((c) => c.access === 'PLUS' && cosmeticLocked(c))
-                ? () => void startPlus()
                 : undefined
             }
           />
