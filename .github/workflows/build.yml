@@ -1,0 +1,166 @@
+# Сборка установщиков на трёх ОС и публикация релиза через gh CLI.
+# Запуск вручную: gh workflow run build.yml -f version=2.0.236
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия без v (напр. 2.0.236)"
+        required: true
+        type: string
+        default: "2.0.236"
+      prerelease:
+        description: "Опубликовать как Pre-release"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            tauri_target: x86_64-pc-windows-msvc
+            bundles: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          - label: linux
+            os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            tauri_target: x86_64-unknown-linux-gnu
+            bundles: |
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+          - label: macos
+            os: macos-latest
+            # Один универсальный dmg на Apple Silicon и Intel.
+            rust_target: aarch64-apple-darwin,x86_64-apple-darwin
+            tauri_target: universal-apple-darwin
+            bundles: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            file \
+            wget
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # Версия в конфигах одинакова с тегом релиза, иначе установщик называется
+      # не так, как его ждут.
+      - name: Set version
+        shell: bash
+        env:
+          V: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          case "$V" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::версия должна быть вида X.Y.Z: $V"; exit 1 ;;
+          esac
+          node -e '
+            const fs = require("node:fs");
+            const v = process.env.V;
+            for (const f of ["package.json", "src-tauri/tauri.conf.json"]) {
+              const s = JSON.parse(fs.readFileSync(f, "utf8"));
+              s.version = v;
+              fs.writeFileSync(f, JSON.stringify(s, null, 2) + "\n");
+            }
+          '
+          perl -0pi -e 's/(\[package\][^\[]*?\nversion = ")[^"]*"/$1$ENV{V}"/s' src-tauri/Cargo.toml
+          grep -q "^version = \"$V\"$" src-tauri/Cargo.toml
+          node -e 'console.log("version:", require("./package.json").version, require("./src-tauri/tauri.conf.json").version)'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.rust_target }}
+
+      - name: Build installers
+        shell: bash
+        run: bun run tauri build --target "${{ matrix.tauri_target }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.label }}
+          path: ${{ matrix.bundles }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: GitHub release
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundles-*
+          path: assets
+          merge-multiple: true
+
+      - name: SHA256SUMS
+        working-directory: assets
+        run: |
+          set -eu
+          ls -la
+          sha256sum $(ls | grep -v '^SHA256SUMS$') > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create release with gh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -eu
+          tag="v$V"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$tag" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "Millida Launcher $V" --prerelease="$PRERELEASE" --latest=false
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" assets/* \
+              --title "Millida Launcher $V" --generate-notes \
+              $( [ "$PRERELEASE" = "true" ] && printf -- '--prerelease' )
+          fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
+            --json name,tagName,isPrerelease,assets \
+            --jq '{name, tag: .tagName, prerelease: .isPrerelease, assets: [.assets[].name]}'
